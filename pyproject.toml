@@ -1,0 +1,9 @@
+[project]
+name = "pandas-timeline"
+version = "0.1.0"
+description = "A Pandas extension for cross-product and transformation of time-series data with discrete, irregular, step-wise changes."
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2.0",
+  "pytest",
+]
