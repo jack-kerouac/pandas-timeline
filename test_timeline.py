@@ -171,19 +171,19 @@ def test_cross_product_fails_without_common_start_date():
     t1 = Timeline.from_segments([ts('00:00', '05:00', 1)])
     t2 = Timeline.from_segments([ts('01:00', '05:00', 2)])
     with pytest.raises(AssertionError) as e:
-        Timeline.cross_product([t1, t2])
+        Timeline.cross_product((t1, t2))
     assert 'start' in str(e.value).lower()
 
 def test_cross_product_fails_without_common_end_date():
     t1 = Timeline.from_segments([ts('00:00', '04:00', 1)])
     t2 = Timeline.from_segments([ts('00:00', '05:00', 2)])
     with pytest.raises(AssertionError) as e:
-        Timeline.cross_product([t1, t2])
+        Timeline.cross_product((t1, t2))
     assert 'end' in str(e.value).lower()
 
 def test_cross_product_single_timeline_single_segment():
     t1 = Timeline.from_segments([ts('00:00', '05:00', 1)])
-    cp = Timeline.cross_product([t1])
+    cp = Timeline.cross_product((t1,))
     df = cp.df
     assert len(df) == 1
     assert df.iloc[0]['start'] == dt('00:00')
@@ -193,7 +193,7 @@ def test_cross_product_single_timeline_single_segment():
 def test_cross_product_two_timelines_single_segment():
     t1 = Timeline.from_segments([ts('00:00', '05:00', 1)])
     t2 = Timeline.from_segments([ts('00:00', '05:00', 2)])
-    cp = Timeline.cross_product([t1, t2])
+    cp = Timeline.cross_product((t1, t2))
     df = cp.df
     assert len(df) == 1
     assert df.iloc[0]['start'] == dt('00:00')
@@ -203,7 +203,7 @@ def test_cross_product_two_timelines_single_segment():
 def test_cross_product_two_timelines_multiple_segments():
     t1 = Timeline.from_segments([ts('00:00', '05:00', 1), ts('05:00', '10:00', 2)])
     t2 = Timeline.from_segments([ts('00:00', '03:00', 3), ts('03:00', '07:00', 4), ts('07:00', '10:00', 5)])
-    cp = Timeline.cross_product([t1, t2])
+    cp = Timeline.cross_product((t1, t2))
     df = cp.df.reset_index(drop=True)
     expected = [
         (dt('00:00'), dt('03:00'), (1, 3)),
@@ -221,7 +221,7 @@ def test_cross_product_three_timelines_two_segments_each():
     t1 = Timeline.from_segments([ts('00:00', '05:00', 1), ts('05:00', '10:00', 2)])
     t2 = Timeline.from_segments([ts('00:00', '05:00', 3), ts('05:00', '10:00', 4)])
     t3 = Timeline.from_segments([ts('00:00', '04:00', 5), ts('04:00', '10:00', 6)])
-    cp = Timeline.cross_product([t1, t2, t3])
+    cp = Timeline.cross_product((t1, t2, t3))
     df = cp.df.reset_index(drop=True)
     expected = [
         (dt('00:00'), dt('04:00'), (1, 3, 5)),

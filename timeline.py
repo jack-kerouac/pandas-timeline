@@ -104,7 +104,7 @@ class Timeline[T]:
         return Timeline.from_segments(merged)
 
     @staticmethod
-    def cross_product(timelines: List['Timeline'], /) -> 'Timeline[Tuple]':
+    def cross_product(timelines: Tuple['Timeline', ...], /) -> 'Timeline[Tuple]':
         # All timelines must cover the same total duration
         starts = [tl.start for tl in timelines]
         ends = [tl.end for tl in timelines]
