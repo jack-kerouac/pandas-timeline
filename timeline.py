@@ -36,7 +36,7 @@ class Timeline(Generic[T]):
         self._df = df.copy()
 
     @staticmethod
-    def from_segments(segments: List[Tuple[pd.Timestamp, pd.Timestamp, T]]) -> 'Timeline':
+    def from_segments(segments: List[Tuple[pd.Timestamp, pd.Timestamp, T]], /) -> 'Timeline':
         """
         segments: List of (start, end, value) tuples.
         """
@@ -45,7 +45,7 @@ class Timeline(Generic[T]):
         return Timeline(df)
 
     @staticmethod
-    def from_dataframe(df: pd.DataFrame) -> 'Timeline':
+    def from_dataframe(df: pd.DataFrame, /) -> 'Timeline':
         Timeline._validate(df)
         return Timeline(df.copy())
 
@@ -79,7 +79,7 @@ class Timeline(Generic[T]):
     def end(self) -> pd.Timestamp:
         return self._df['end'].iloc[-1]
 
-    def map(self, func: Callable[[T], U]) -> 'Timeline[U]':
+    def map(self, func: Callable[[T], U], /) -> 'Timeline[U]':
         new_df = self._df.assign(value=self._df['value'].apply(func))
         return Timeline.from_dataframe(new_df)
 
@@ -107,7 +107,7 @@ class Timeline(Generic[T]):
         return Timeline.from_segments(merged)
 
     @staticmethod
-    def cross_product(timelines: List['Timeline']) -> 'Timeline':
+    def cross_product(timelines: List['Timeline'], /) -> 'Timeline':
         # All timelines must cover the same total duration
         starts = [tl.start for tl in timelines]
         ends = [tl.end for tl in timelines]
