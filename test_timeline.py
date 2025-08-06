@@ -29,40 +29,35 @@ def test_creation_succeeds_with_valid_segments():
     assert timeline.end == dt('03:00')
 
 def test_creation_fails_with_no_segment():
-    with pytest.raises(Exception) as e:
+    with pytest.raises(ValueError, match=r".*at least one segment.*"):
         Timeline.from_segments([])
-    assert 'at least one segment' in str(e.value).lower()
 
 def test_creation_fails_when_segment_start_after_end():
-    with pytest.raises(Exception) as e:
+    with pytest.raises(ValueError, match=r".*start must be before end.*"):
         Timeline.from_segments([
             ts('02:00', '01:00', 1)
         ])
-    assert 'start must be before end' in str(e.value).lower()
 
 def test_creation_fails_when_segments_overlap():
-    with pytest.raises(Exception) as e:
+    with pytest.raises(ValueError, match=r".*contiguous.*"):
         Timeline.from_segments([
             ts('00:00', '03:00', 1),
             ts('02:00', '05:00', 2)
         ])
-    assert 'contiguous' in str(e.value).lower()
 
 def test_creation_fails_when_segments_have_gaps():
-    with pytest.raises(Exception) as e:
+    with pytest.raises(ValueError, match=r".*contiguous.*"):
         Timeline.from_segments([
             ts('00:00', '02:00', 1),
             ts('03:00', '05:00', 2)
         ])
-    assert 'contiguous' in str(e.value).lower()
 
 def test_creation_fails_when_segments_not_sorted():
-    with pytest.raises(Exception) as e:
+    with pytest.raises(ValueError, match=r".*sorted.*"):
         Timeline.from_segments([
             ts('02:00', '04:00', 2),
             ts('00:00', '02:00', 1)
         ])
-    assert 'sorted' in str(e.value).lower()
 
 def test_from_segments_with_gaps_no_gaps():
     timeline = Timeline.from_segments_with_gaps([
@@ -115,9 +110,8 @@ def test_from_segments_with_gaps_multiple_gaps():
             assert df.iloc[i]['value'] == value
 
 def test_from_segments_with_gaps_empty_list():
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError, match=r".*at least one segment.*"):
         Timeline.from_segments_with_gaps([])
-    assert 'at least one segment' in str(e.value).lower()
 
 def test_from_segments_with_gaps_unsorted_segments():
     timeline = Timeline.from_segments_with_gaps([

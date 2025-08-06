@@ -1,4 +1,5 @@
-from typing import Callable, List, Tuple, Self
+from typing import Callable, Self
+from collections.abc import Sequence
 
 import pandas as pd
 import numpy as np
@@ -34,7 +35,7 @@ class Timeline[T]:
         self._df = df.copy()
 
     @staticmethod
-    def from_segments(segments: List[Tuple[pd.Timestamp, pd.Timestamp, T]], /) -> 'Timeline[T]':
+    def from_segments(segments: Sequence[tuple[pd.Timestamp, pd.Timestamp, T]], /) -> 'Timeline[T]':
         """
         segments: List of (start, end, value) tuples.
         """
@@ -49,16 +50,16 @@ class Timeline[T]:
 
     @staticmethod
     def from_segments_with_gaps(
-        segments: List[Tuple[pd.Timestamp, pd.Timestamp, T]], 
+        segments: Sequence[tuple[pd.Timestamp, pd.Timestamp, T]], 
         /, 
         gap_value=pd.NA
     ) -> 'Timeline[T]':
         """
         Create Timeline from segments that may have gaps. Gaps are filled with gap_value.
-        
+
         segments: List of (start, end, value) tuples, can be non-contiguous.
         gap_value: Value to use for gap segments (default: pd.NA).
-        
+
         See pandas documentation about pd.NA semantics:
         https://pandas.pydata.org/docs/user_guide/missing_data.html#na-semantics
         """
@@ -81,15 +82,21 @@ class Timeline[T]:
         return Timeline.from_segments(filled_segments)
 
     @staticmethod
-    def _validate(df: pd.DataFrame):
-        assert len(df) > 0, "Timeline must have at least one segment"
-        assert df.columns.isin(['start', 'end', 'value']).all(), "DataFrame must contain 'start', 'end', and 'value' columns"
-        assert df['start'].dtype == 'datetime64[ns]', "Start must be a datetime64 column"
-        assert df['end'].dtype == 'datetime64[ns]', "End must be a datetime64 column"
-
-        assert df['start'].is_monotonic_increasing, "Segments must be sorted by start time"
-        assert len(df) <= 1 or (df['end'].iloc[:-1].values == df['start'].iloc[1:].values).all(), "Segments must be contiguous"
-        assert (df['start'] < df['end']).all(), "Start must be before end"
+    def _validate(df: pd.DataFrame) -> None:
+        if len(df) == 0:
+            raise ValueError("Timeline must have at least one segment")
+        if not df.columns.isin(['start', 'end', 'value']).all():
+            raise ValueError("DataFrame must contain 'start', 'end', and 'value' columns")
+        if df['start'].dtype != 'datetime64[ns]':
+            raise TypeError("Start must be a datetime64 column")
+        if df['end'].dtype != 'datetime64[ns]':
+            raise TypeError("End must be a datetime64 column")
+        if not df['start'].is_monotonic_increasing:
+            raise ValueError("Segments must be sorted by start time")
+        if len(df) > 1 and not (df['end'].iloc[:-1].values == df['start'].iloc[1:].values).all():
+            raise ValueError("Segments must be contiguous")
+        if not (df['start'] < df['end']).all():
+            raise ValueError("Start must be before end")
 
     @property
     def df(self) -> pd.DataFrame:
@@ -115,6 +122,19 @@ class Timeline[T]:
         return Timeline.from_dataframe(new_df)
 
     def slice(self, start: pd.Timestamp, end: pd.Timestamp) -> Self:
+        """Extract a sub-period as a new Timeline.
+
+        Args:
+            start: Start time for the slice (inclusive).
+            end: End time for the slice (exclusive).
+
+        Returns:
+            A new Timeline containing only segments overlapping with [start, end).
+
+        Note:
+            Segments that partially overlap with the slice period will be
+            truncated to fit within the specified bounds.
+        """
         # Extract segments overlapping with [start, end)
         mask = (self._df['end'] > start) & (self._df['start'] < end)
         sliced = self._df[mask].copy()
@@ -128,6 +148,13 @@ class Timeline[T]:
         return Timeline(sliced)
 
     def merge_adjacent(self) -> Self:
+        """Merge adjacent segments with identical values.
+
+        Returns:
+            A new Timeline with adjacent segments containing the same value merged together.
+            This operation reduces the number of segments by combining consecutive
+            segments that have identical values.
+        """
         # Merge adjacent segments with same value
         merged = []
         for _, row in self._df.iterrows():
@@ -138,7 +165,7 @@ class Timeline[T]:
         return Timeline.from_segments(merged)
 
     @staticmethod
-    def cross_product(timelines: Tuple['Timeline', ...], /) -> 'Timeline[Tuple]':
+    def cross_product(timelines: tuple['Timeline', ...], /) -> 'Timeline[tuple]':
         # All timelines must cover the same total duration
         starts = [tl.start for tl in timelines]
         ends = [tl.end for tl in timelines]
@@ -169,5 +196,20 @@ class Timeline[T]:
             segments.append((seg_start, seg_end, tuple(values)))
         return Timeline.from_segments(segments)
 
-    def __repr__(self):
+    def __len__(self) -> int:
+        """Return the number of segments in the timeline."""
+        return len(self._df)
+
+    def __iter__(self):
+        """Iterate over timeline segments as (start, end, value) tuples."""
+        for _, row in self._df.iterrows():
+            yield (row['start'], row['end'], row['value'])
+
+    def __eq__(self, other) -> bool:
+        """Compare two timelines for equality."""
+        if not isinstance(other, Timeline):
+            return NotImplemented
+        return self._df.equals(other._df)
+
+    def __repr__(self) -> str:
         return f"Timeline({self._df})"
