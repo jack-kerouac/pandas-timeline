@@ -12,7 +12,7 @@ pip install -e .
 
 A `Timeline<T>` represents a value of type `<T>` as it changes over a continuous period. Conceptually, it behaves like a step function: the value remains constant for a segment of time and then instantly changes to a new value at the start of the next segment.
 
-The structure is built from a series of back-to-back, non-overlapping time segments. This guarantees that for any single point in time within its total duration, there is one and only one value defined. While it can be constructed from various raw data sources, its core strength lies in its powerful and generic manipulation capabilities.
+The structure consists of a series of back-to-back, non-overlapping time segments. This guarantees that for any single point in time within its total duration, there is one and only one value defined. While it can be constructed from various raw data sources, its core strength lies in its powerful and generic manipulation capabilities.
 
 ## Key Operations
 

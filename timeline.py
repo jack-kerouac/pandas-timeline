@@ -1,6 +1,7 @@
 from typing import Callable, List, Tuple, Self
 
 import pandas as pd
+import numpy as np
 
 class Timeline[T]:
     """
@@ -45,6 +46,39 @@ class Timeline[T]:
     def from_dataframe(df: pd.DataFrame, /) -> 'Timeline':
         Timeline._validate(df)
         return Timeline(df.copy())
+
+    @staticmethod
+    def from_segments_with_gaps(
+        segments: List[Tuple[pd.Timestamp, pd.Timestamp, T]], 
+        /, 
+        gap_value=pd.NA
+    ) -> 'Timeline[T]':
+        """
+        Create Timeline from segments that may have gaps. Gaps are filled with gap_value.
+        
+        segments: List of (start, end, value) tuples, can be non-contiguous.
+        gap_value: Value to use for gap segments (default: pd.NA).
+        
+        See pandas documentation about pd.NA semantics:
+        https://pandas.pydata.org/docs/user_guide/missing_data.html#na-semantics
+        """
+        if not segments:
+            raise ValueError("Timeline must have at least one segment")
+
+        # Sort by start time
+        segments = sorted(segments, key=lambda x: x[0])
+
+        # Fill gaps with gap_value segments
+        filled_segments = []
+        for i, (start, end, value) in enumerate(segments):
+            # Add gap-filling segment if needed
+            if i > 0:
+                prev_segment = filled_segments[-1]
+                if prev_segment[1] < start:
+                    filled_segments.append((prev_segment[1], start, gap_value))
+            filled_segments.append((start, end, value))
+
+        return Timeline.from_segments(filled_segments)
 
     @staticmethod
     def _validate(df: pd.DataFrame):

@@ -64,6 +64,86 @@ def test_creation_fails_when_segments_not_sorted():
         ])
     assert 'sorted' in str(e.value).lower()
 
+def test_from_segments_with_gaps_no_gaps():
+    timeline = Timeline.from_segments_with_gaps([
+        ts('00:00', '01:00', 1),
+        ts('01:00', '02:00', 2)
+    ])
+    assert len(timeline.df) == 2
+    assert timeline.start == dt('00:00')
+    assert timeline.end == dt('02:00')
+    assert list(timeline.df['value']) == [1, 2]
+
+def test_from_segments_with_gaps_single_gap():
+    timeline = Timeline.from_segments_with_gaps([
+        ts('00:00', '01:00', 1),
+        ts('02:00', '03:00', 2)
+    ])
+    df = timeline.df.reset_index(drop=True)
+    assert len(df) == 3
+    assert df.iloc[0]['start'] == dt('00:00')
+    assert df.iloc[0]['end'] == dt('01:00')
+    assert df.iloc[0]['value'] == 1
+    assert df.iloc[1]['start'] == dt('01:00')
+    assert df.iloc[1]['end'] == dt('02:00')
+    assert pd.isna(df.iloc[1]['value'])
+    assert df.iloc[2]['start'] == dt('02:00')
+    assert df.iloc[2]['end'] == dt('03:00')
+    assert df.iloc[2]['value'] == 2
+
+def test_from_segments_with_gaps_multiple_gaps():
+    timeline = Timeline.from_segments_with_gaps([
+        ts('00:00', '01:00', 1),
+        ts('02:00', '03:00', 2),
+        ts('05:00', '06:00', 3)
+    ])
+    df = timeline.df.reset_index(drop=True)
+    assert len(df) == 5
+    expected = [
+        (dt('00:00'), dt('01:00'), 1),
+        (dt('01:00'), dt('02:00'), pd.NA),
+        (dt('02:00'), dt('03:00'), 2),
+        (dt('03:00'), dt('05:00'), pd.NA),
+        (dt('05:00'), dt('06:00'), 3)
+    ]
+    for i, (start, end, value) in enumerate(expected):
+        assert df.iloc[i]['start'] == start
+        assert df.iloc[i]['end'] == end
+        if pd.isna(value):
+            assert pd.isna(df.iloc[i]['value'])
+        else:
+            assert df.iloc[i]['value'] == value
+
+def test_from_segments_with_gaps_empty_list():
+    with pytest.raises(ValueError) as e:
+        Timeline.from_segments_with_gaps([])
+    assert 'at least one segment' in str(e.value).lower()
+
+def test_from_segments_with_gaps_unsorted_segments():
+    timeline = Timeline.from_segments_with_gaps([
+        ts('02:00', '03:00', 2),
+        ts('00:00', '01:00', 1),
+        ts('05:00', '06:00', 3)
+    ])
+    df = timeline.df.reset_index(drop=True)
+    assert len(df) == 5
+    assert df.iloc[0]['value'] == 1
+    assert pd.isna(df.iloc[1]['value'])
+    assert df.iloc[2]['value'] == 2
+    assert pd.isna(df.iloc[3]['value'])
+    assert df.iloc[4]['value'] == 3
+
+def test_from_segments_with_gaps_custom_gap_value():
+    timeline = Timeline.from_segments_with_gaps([
+        ts('00:00', '01:00', 10),
+        ts('02:00', '03:00', 20)
+    ], gap_value=-999)
+    df = timeline.df.reset_index(drop=True)
+    assert len(df) == 3
+    assert df.iloc[0]['value'] == 10
+    assert df.iloc[1]['value'] == -999
+    assert df.iloc[2]['value'] == 20
+
 def test_slice_shrinks_single_segment():
     timeline = Timeline.from_segments([
         ts('00:00', '01:00', 1)
