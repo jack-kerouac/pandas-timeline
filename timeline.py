@@ -211,5 +211,31 @@ class Timeline[T]:
             return NotImplemented
         return self._df.equals(other._df)
 
+    def at(self, timestamp: pd.Timestamp, /) -> T:
+        """Get the value at a specific timestamp.
+
+        Args:
+            timestamp: The timestamp to query for a value.
+
+        Returns:
+            The value of type T that is active at the given timestamp.
+
+        Raises:
+            ValueError: If the timestamp is outside the timeline's duration.
+
+        Note:
+            This operation uses binary search for O(log n) performance.
+            For timestamps exactly at segment boundaries, returns the value
+            of the segment that starts at that timestamp.
+        """
+        if timestamp < self.start or timestamp >= self.end:
+            raise ValueError(f"Timestamp {timestamp} is outside timeline duration [{self.start}, {self.end})")
+        
+        # Use binary search to find the correct segment
+        # searchsorted with side='right' finds the insertion point after existing values
+        # Subtracting 1 gives us the index of the segment containing the timestamp
+        idx = self._df['start'].searchsorted(timestamp, side='right') - 1
+        return self._df.iloc[idx]['value']
+
     def __repr__(self) -> str:
         return f"Timeline({self._df})"

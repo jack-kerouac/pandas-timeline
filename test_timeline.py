@@ -33,7 +33,7 @@ def test_creation_fails_with_no_segment():
         Timeline.from_segments([])
 
 def test_creation_fails_when_segment_start_after_end():
-    with pytest.raises(ValueError, match=r".*start must be before end.*"):
+    with pytest.raises(ValueError, match=r".*Start must be before end.*"):
         Timeline.from_segments([
             ts('02:00', '01:00', 1)
         ])
@@ -239,6 +239,82 @@ def test_map_identity_returns_same_values():
     assert list(mapped.df['value']) == [42]
     assert mapped.df['start'].iloc[0] == dt('00:00')
     assert mapped.df['end'].iloc[0] == dt('01:00')
+
+
+def test_at_single_segment():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', 42)
+    ])
+    assert timeline.at(dt('00:00')) == 42
+    assert timeline.at(dt('00:30')) == 42
+    assert timeline.at(dt('00:59')) == 42
+
+def test_at_multiple_segments():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', 1),
+        ts('01:00', '02:00', 2),
+        ts('02:00', '03:00', 3)
+    ])
+    assert timeline.at(dt('00:00')) == 1
+    assert timeline.at(dt('00:30')) == 1
+    assert timeline.at(dt('00:59')) == 1
+    assert timeline.at(dt('01:00')) == 2
+    assert timeline.at(dt('01:30')) == 2
+    assert timeline.at(dt('01:59')) == 2
+    assert timeline.at(dt('02:00')) == 3
+    assert timeline.at(dt('02:30')) == 3
+    assert timeline.at(dt('02:59')) == 3
+
+def test_at_exact_segment_boundaries():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', 'A'),
+        ts('01:00', '02:00', 'B'),
+        ts('02:00', '03:00', 'C')
+    ])
+    # At exact start times, should return the value of the segment starting at that time
+    assert timeline.at(dt('00:00')) == 'A'
+    assert timeline.at(dt('01:00')) == 'B'
+    assert timeline.at(dt('02:00')) == 'C'
+
+def test_at_with_gaps():
+    # Test with timeline that has gaps filled with pd.NA
+    timeline = Timeline.from_segments_with_gaps([
+        ts('00:00', '01:00', 1),
+        ts('02:00', '03:00', 2)
+    ])
+    assert timeline.at(dt('00:30')) == 1
+    assert pd.isna(timeline.at(dt('01:30')))
+    assert timeline.at(dt('02:30')) == 2
+
+def test_at_timestamp_before_timeline_start():
+    timeline = Timeline.from_segments([ts('01:00', '02:00', 1)])
+    with pytest.raises(ValueError, match=r"Timestamp .* is outside timeline duration"):
+        timeline.at(dt('00:30'))
+
+def test_at_timestamp_at_timeline_end():
+    timeline = Timeline.from_segments([ts('00:00', '01:00', 1)])
+    # At the exact end time should raise error (end is exclusive)
+    with pytest.raises(ValueError, match=r"Timestamp .* is outside timeline duration"):
+        timeline.at(dt('01:00'))
+
+def test_at_timestamp_after_timeline_end():
+    timeline = Timeline.from_segments([ts('00:00', '01:00', 1)])
+    with pytest.raises(ValueError, match=r"Timestamp .* is outside timeline duration"):
+        timeline.at(dt('02:00'))
+
+def test_at_with_complex_timeline():
+    # Test with a more complex timeline including gaps
+    timeline = Timeline.from_segments_with_gaps([
+        ts('00:00', '01:00', 'morning'),
+        ts('03:00', '04:00', 'afternoon'),
+        ts('06:00', '07:00', 'evening')
+    ], gap_value='free_time')
+    
+    assert timeline.at(dt('00:30')) == 'morning'
+    assert timeline.at(dt('01:30')) == 'free_time'
+    assert timeline.at(dt('03:30')) == 'afternoon'
+    assert timeline.at(dt('04:30')) == 'free_time'
+    assert timeline.at(dt('06:30')) == 'evening'
 
 
 def test_cross_product_fails_without_common_start_date():
