@@ -2,10 +2,15 @@
 
 ## Installation
 
-Install dependencies with:
+Install dependencies and set up development environment:
 
 ```bash
-pip install -e .
+# Install all dependencies (recommended)
+uv sync
+
+# Or install in editable/development mode
+# (links to source code for immediate changes)
+uv pip install -e .
 ```
 
 ## Timeline

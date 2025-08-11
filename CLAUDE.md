@@ -11,24 +11,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Testing
 ```bash
 # Run all tests
-python -m pytest test_timeline.py -v
+uv run pytest test_timeline.py -v
 
 # Run specific test
-python -m pytest test_timeline.py::test_cross_product_two_timelines_multiple_segments -v
+uv run pytest test_timeline.py::test_cross_product_two_timelines_multiple_segments -v
 
 # Run tests for specific functionality
-python -m pytest test_timeline.py -k "cross_product" -v
+uv run pytest test_timeline.py -k "cross_product" -v
 ```
 
 ### Installation
 ```bash
-# Development installation
-pip install -e .
+# Install all dependencies (recommended for development)
+uv sync
+
+# Or install in editable mode (links to source for immediate changes)
+uv pip install -e .
 ```
 
 ### Environment Setup
 ```bash
-# Activate virtual environment (located in .venv)
+# uv automatically manages virtual environments
+# Use 'uv run' prefix for commands, or manually activate:
 source .venv/bin/activate
 ```
 
