@@ -121,6 +121,12 @@ class Timeline[T]:
         new_df = self._df.assign(value=self._df['value'].apply(func))
         return Timeline.from_dataframe(new_df)
 
+    def filter(self, predicate: Callable[[T], bool], /, *, gap_value=pd.NA) -> Self:
+        new_df = self._df.copy()
+        mask = new_df['value'].apply(predicate)
+        new_df.loc[~mask, 'value'] = gap_value
+        return Timeline.from_dataframe(new_df)
+
     def slice(self, start: pd.Timestamp, end: pd.Timestamp) -> Self:
         """Extract a sub-period as a new Timeline.
 

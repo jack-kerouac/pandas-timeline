@@ -383,3 +383,67 @@ def test_cross_product_three_timelines_two_segments_each():
         assert df.iloc[i]['start'] == start
         assert df.iloc[i]['end'] == end
         assert df.iloc[i]['value'] == value
+
+
+def test_filter_keeps_matching_segments():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', 1),
+        ts('01:00', '02:00', 2),
+        ts('02:00', '03:00', 3),
+    ])
+    result = timeline.filter(lambda v: v > 1)
+    df = result.df
+    assert len(df) == 3
+    assert pd.isna(df.iloc[0]['value'])
+    assert df.iloc[1]['value'] == 2
+    assert df.iloc[2]['value'] == 3
+
+
+def test_filter_all_match():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', 10),
+        ts('01:00', '02:00', 20),
+    ])
+    result = timeline.filter(lambda v: v > 0)
+    df = result.df
+    assert len(df) == 2
+    assert df.iloc[0]['value'] == 10
+    assert df.iloc[1]['value'] == 20
+
+
+def test_filter_none_match():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', 1),
+        ts('01:00', '02:00', 2),
+    ])
+    result = timeline.filter(lambda v: v > 100)
+    df = result.df
+    assert len(df) == 2
+    assert pd.isna(df.iloc[0]['value'])
+    assert pd.isna(df.iloc[1]['value'])
+
+
+def test_filter_with_custom_gap_value():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', 'a'),
+        ts('01:00', '02:00', 'b'),
+        ts('02:00', '03:00', 'a'),
+    ])
+    result = timeline.filter(lambda v: v == 'a', gap_value='FILTERED')
+    df = result.df
+    assert df.iloc[0]['value'] == 'a'
+    assert df.iloc[1]['value'] == 'FILTERED'
+    assert df.iloc[2]['value'] == 'a'
+
+
+def test_filter_preserves_time_structure():
+    timeline = Timeline.from_segments([
+        ts('09:00', '10:00', 5),
+        ts('10:00', '11:00', 15),
+    ])
+    result = timeline.filter(lambda v: v > 10)
+    df = result.df
+    assert df.iloc[0]['start'] == dt('09:00')
+    assert df.iloc[0]['end'] == dt('10:00')
+    assert df.iloc[1]['start'] == dt('10:00')
+    assert df.iloc[1]['end'] == dt('11:00')
