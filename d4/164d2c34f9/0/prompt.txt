@@ -1,0 +1,9 @@
+Create a HTML page in this repo that visualizes what DIP is and what operations are available. Take rough inspiration for how reactive programming uses marble diagrams, as far as it is transverable.
+
+---
+
+Create a HTML page in this repo that visualizes what the data structure in tis repo is and what operations are available. Take rough inspiration for how reactive programming uses marble diagrams, as far as it is transverable.
+
+---
+
+Continue

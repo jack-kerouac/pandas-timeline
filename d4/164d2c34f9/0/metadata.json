@@ -1,0 +1,80 @@
+{
+  "cli_version": "0.6.2",
+  "checkpoint_id": "d4164d2c34f9",
+  "session_id": "b9239911-68cf-45ea-bef9-67ec7ef5315f",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-10T04:42:47.160819Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "timeline-visualization.html"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5",
+  "turn_id": "9f13fc747183",
+  "token_usage": {
+    "input_tokens": 11417,
+    "cache_creation_tokens": 103524,
+    "cache_read_tokens": 619624,
+    "output_tokens": 21073,
+    "api_call_count": 19
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-10T04:42:47.069806Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 16,
+    "total_committed": 0,
+    "total_lines_changed": 16,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1653,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/agents/codebase-consistency-checker.md": 52,
+        ".claude/agents/entire-search.md": 25,
+        ".claude/settings.json": 84,
+        ".idea/.gitignore": 8,
+        ".idea/inspectionProfiles/profiles_settings.xml": 6,
+        ".idea/misc.xml": 7,
+        ".idea/modules.xml": 8,
+        ".idea/pandas-timeline.iml": 10,
+        ".idea/vcs.xml": 6,
+        "originals/data-interval-partition.test.ts": 567,
+        "originals/data-interval-partition.ts": 309,
+        "originals/data-interval.test.ts": 112,
+        "originals/data-interval.ts": 75,
+        "timeline-visualization.html": 384
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 45,
+      "user_lines_removed": 8,
+      "agent_lines_added": 1608,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".idea/.gitignore": 8,
+        ".idea/inspectionProfiles/profiles_settings.xml": 6,
+        ".idea/misc.xml": 7,
+        ".idea/modules.xml": 8,
+        ".idea/pandas-timeline.iml": 10,
+        ".idea/vcs.xml": 6
+      },
+      "user_removed_per_file": {
+        "timeline-visualization.html": 8
+      }
+    }
+  ]
+}
