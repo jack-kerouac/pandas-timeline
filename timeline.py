@@ -48,6 +48,18 @@ class Timeline[T]:
         Timeline._validate(df)
         return Timeline(df.copy())
 
+    @classmethod
+    def _from_trusted(cls, df: pd.DataFrame, /) -> Self:
+        """
+        Internal constructor for a DataFrame that is freshly created, not shared
+        with any external caller, and known to satisfy the invariants (e.g. a
+        value-only transform of an already-validated frame). Skips validation
+        and the defensive copy.
+        """
+        timeline = cls.__new__(cls)
+        timeline._df = df
+        return timeline
+
     @staticmethod
     def from_segments_with_gaps(
         segments: Sequence[tuple[pd.Timestamp, pd.Timestamp, T]], 
@@ -119,7 +131,7 @@ class Timeline[T]:
 
     def map[U](self, func: Callable[[T], U], /) -> 'Timeline[U]':
         new_df = self._df.assign(value=self._df['value'].apply(func))
-        return Timeline.from_dataframe(new_df)
+        return Timeline._from_trusted(new_df)
 
     def filter(self, predicate: Callable[[T], bool], /, *, gap_value=pd.NA) -> Self:
         new_df = self._df.copy()
@@ -129,7 +141,7 @@ class Timeline[T]:
             # would upcast surviving values to float64.
             new_df['value'] = new_df['value'].astype(object)
             new_df.loc[~mask, 'value'] = gap_value
-        return Timeline.from_dataframe(new_df)
+        return Timeline._from_trusted(new_df)
 
     def slice(self, start: pd.Timestamp, end: pd.Timestamp) -> Self:
         """Extract a sub-period as a new Timeline.
