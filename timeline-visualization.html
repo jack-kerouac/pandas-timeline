@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pandas-timeline — Timeline[T] visualized</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f7f8fa;
+    --text: #1c2330;
+    --muted: #6b7280;
+    --border: #e2e5ea;
+    --accent: #d3455b;
+    --code-bg: #eef0f4;
+    --na-bg: #eceef1;
+    --na-line: #c6cad2;
+    --c0: #4c7bd9;
+    --c1: #e08b3c;
+    --c2: #4aa96c;
+    --c3: #9a6bd0;
+    --c4: #4fb3bf;
+    --c5: #d05c7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171d;
+      --panel: #1b1f27;
+      --text: #e6e9ef;
+      --muted: #97a0ad;
+      --border: #2b313c;
+      --accent: #ef6a80;
+      --code-bg: #232935;
+      --na-bg: #232833;
+      --na-line: #3d4451;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 30px; margin: 0 0 4px; }
+  h1 code { font-size: 26px; }
+  h2 { font-size: 21px; margin: 56px 0 8px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .subtitle { color: var(--muted); margin: 0 0 8px; }
+  p { max-width: 72ch; }
+  code, pre {
+    font: 13.5px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--code-bg);
+    border-radius: 5px;
+    padding: 1px 5px;
+  }
+  .legend { color: var(--muted); font-size: 14px; max-width: 72ch; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px 14px;
+    margin: 20px 0 28px;
+  }
+  .card h3 { margin: 0 0 2px; font-size: 17px; }
+  .card h3 code { background: none; padding: 0; font-size: 15px; }
+  .card .desc { color: var(--muted); font-size: 14.5px; margin: 2px 0 14px; max-width: 76ch; }
+  .card .note { color: var(--muted); font-size: 13.5px; margin: 10px 0 4px; max-width: 76ch; }
+
+  .lane { position: relative; }
+  .lane-label {
+    position: absolute; top: -2px; left: 2px;
+    font-size: 12px; color: var(--muted);
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .lane svg { display: block; width: 100%; height: auto; }
+
+  .opbox {
+    display: flex; flex-direction: column; align-items: center;
+    margin: 2px 0 6px;
+  }
+  .opbox .stem { width: 1.5px; height: 10px; background: var(--muted); }
+  .opbox .box {
+    border: 1.5px solid var(--text);
+    border-radius: 7px;
+    background: var(--bg);
+    padding: 5px 16px;
+  }
+  .opbox .box code { background: none; padding: 0; }
+  .opbox .head {
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid var(--muted);
+  }
+
+  .marble-out { display: flex; align-items: center; gap: 12px; padding: 6px 0 10px 16px; }
+  .marble-out .m {
+    width: 52px; height: 52px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 600; font-size: 14px;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .marble-out .cap { color: var(--muted); font-size: 13.5px; }
+
+  ul.tight { padding-left: 22px; }
+  ul.tight li { margin: 5px 0; max-width: 72ch; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; margin-top: 12px; }
+  th, td { text-align: left; padding: 7px 12px 7px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  td code { white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<!-- shared SVG defs: hatch pattern for NA, arrowhead for time axes -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+      <rect width="7" height="7" fill="var(--na-bg)"/>
+      <line x1="0" y1="0" x2="0" y2="7" stroke="var(--na-line)" stroke-width="2"/>
+    </pattern>
+    <marker id="arrow" markerWidth="9" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/>
+    </marker>
+  </defs>
+</svg>
+
+<main>
+  <h1><code>Timeline[T]</code></h1>
+  <p class="subtitle">A step function over time: one value of type <code>T</code> at every instant,
+     changing only at segment boundaries. Backed by a pandas DataFrame with
+     <code>start</code>, <code>end</code>, <code>value</code> columns.</p>
+
+  <h2>The data structure</h2>
+  <div class="card">
+    <h3><code>Timeline.from_segments([(start, end, value), …])</code></h3>
+    <p class="desc">Segments are validated on construction — violations raise
+       <code>ValueError</code> / <code>TypeError</code>, never assertions.</p>
+    <div id="hero"></div>
+    <ul class="tight" style="font-size:14.5px">
+      <li><strong>Contiguous</strong> — <code>segment[i].end == segment[i+1].start</code>: no gaps, no overlaps.</li>
+      <li><strong>Sorted</strong> — start times are monotonically increasing.</li>
+      <li><strong>Half-open</strong> — each segment covers <code>[start, end)</code>; <code>start &lt; end</code> always.</li>
+      <li><strong>Total</strong> — exactly one value is defined for any point within the duration.</li>
+      <li><strong>Immutable</strong> — every operation returns a new Timeline; <code>.df</code> exposes only a copy.</li>
+    </ul>
+  </div>
+
+  <h2>Querying</h2>
+  <div id="ops-query"></div>
+
+  <h2>Transforming values</h2>
+  <div id="ops-transform"></div>
+
+  <h2>Reshaping time</h2>
+  <div id="ops-reshape"></div>
+
+  <h2>Combining timelines</h2>
+  <div id="ops-combine"></div>
+
+  <h2>Handling gaps</h2>
+  <div id="ops-gaps"></div>
+
+  <h2>The rest of the API</h2>
+  <div class="card">
+    <table>
+      <tr><th>Member</th><th>What it does</th></tr>
+      <tr><td><code>Timeline.from_dataframe(df)</code></td><td>Construct directly from a validated <code>start/end/value</code> DataFrame.</td></tr>
+      <tr><td><code>tl.df</code></td><td>Copy of the internal DataFrame — safe to mutate, never aliases internals.</td></tr>
+      <tr><td><code>tl.start</code> / <code>tl.end</code></td><td>First segment’s start / last segment’s end.</td></tr>
+      <tr><td><code>len(tl)</code></td><td>Number of segments.</td></tr>
+      <tr><td><code>for s, e, v in tl:</code></td><td>Iterate segments as <code>(start, end, value)</code> tuples.</td></tr>
+      <tr><td><code>tl == other</code></td><td>Segment-wise equality of the underlying DataFrames.</td></tr>
+    </table>
+  </div>
+</main>
+
+<script>
+(() => {
+  const W = 1000, PAD = 26, RPAD = 42;
+  const BAND_Y = 14, BAND_H = 36, AXIS_Y = 66, TICK_Y = 84;
+  const LANE_H = 92;
+  const COLORS = ['var(--c0)','var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)'];
+
+  const fmt = h => {
+    const H = Math.floor(h), M = Math.round((h - H) * 60);
+    return String(H).padStart(2,'0') + ':' + String(M).padStart(2,'0');
+  };
+
+  // Render one timeline lane as an SVG string.
+  // segments: [t0, t1, label, colorIndex|'na']
+  function lane(segs, domain, opts = {}) {
+    const [d0, d1] = domain;
+    const x = t => PAD + (t - d0) / (d1 - d0) * (W - PAD - RPAD);
+    let s = '';
+
+    // dimmed regions outside a slice window (drawn under the bands)
+    // segment bands
+    for (const [t0, t1, label, c] of segs) {
+      const isNA = c === 'na';
+      const fill = isNA ? 'url(#hatch)' : COLORS[c];
+      s += `<rect x="${x(t0)}" y="${BAND_Y}" width="${x(t1)-x(t0)}" height="${BAND_H}" fill="${fill}" ${isNA ? 'stroke="var(--na-line)" stroke-width="1"' : ''}/>`;
+      const tx = (x(t0) + x(t1)) / 2;
+      s += `<text x="${tx}" y="${BAND_Y + BAND_H/2 + 5}" text-anchor="middle" font-size="${opts.smallText ? 12.5 : 14.5}" font-weight="600" ${isNA ? 'font-style="italic" fill="var(--muted)"' : 'fill="#fff"'} font-family="ui-monospace,Menlo,monospace">${label}</text>`;
+    }
+
+    // ticks + boundary time labels
+    const bounds = [...new Set(segs.flatMap(([a, b]) => [a, b]))].sort((a, b) => a - b);
+    for (const t of bounds) {
+      s += `<line x1="${x(t)}" y1="${BAND_Y + BAND_H}" x2="${x(t)}" y2="${AXIS_Y + 4}" stroke="var(--muted)" stroke-width="1"/>`;
+      s += `<text x="${x(t)}" y="${TICK_Y}" text-anchor="middle" font-size="11.5" fill="var(--muted)" font-family="ui-monospace,Menlo,monospace">${fmt(t)}</text>`;
+    }
+
+    // inclusive/exclusive dots: filled at each segment start, open at each run's end
+    if (opts.dots !== false) {
+      const yMid = BAND_Y + BAND_H / 2;
+      const starts = new Set(segs.map(sg => sg[0]));
+      for (const [t0] of segs)
+        s += `<circle cx="${x(t0)}" cy="${yMid}" r="4.5" fill="var(--text)" stroke="var(--panel)" stroke-width="1.5"/>`;
+      for (const [, t1] of segs)
+        if (!starts.has(t1))  // an end that no segment continues from → exclusive open dot
+          s += `<circle cx="${x(t1)}" cy="${yMid}" r="4.5" fill="var(--panel)" stroke="var(--text)" stroke-width="2"/>`;
+    }
+
+    // time axis with arrowhead
+    s += `<line x1="${PAD}" y1="${AXIS_Y}" x2="${W - 6}" y2="${AXIS_Y}" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow)"/>`;
+
+    // slice window overlay
+    if (opts.window) {
+      const [w0, w1] = opts.window;
+      s += `<rect x="${PAD}" y="${BAND_Y - 8}" width="${x(w0) - PAD}" height="${BAND_H + 16}" fill="var(--panel)" opacity="0.72"/>`;
+      s += `<rect x="${x(w1)}" y="${BAND_Y - 8}" width="${W - RPAD - x(w1) + PAD}" height="${BAND_H + 16}" fill="var(--panel)" opacity="0.72"/>`;
+      s += `<rect x="${x(w0)}" y="${BAND_Y - 8}" width="${x(w1) - x(w0)}" height="${BAND_H + 16}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 4" rx="4"/>`;
+    }
+
+    // vertical query marker for at()
+    if (opts.marker !== undefined) {
+      const mx = x(opts.marker);
+      s += `<line x1="${mx}" y1="2" x2="${mx}" y2="${AXIS_Y}" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4"/>`;
+      s += `<path d="M${mx - 5},2 L${mx + 5},2 L${mx},10 z" fill="var(--accent)"/>`;
+    }
+
+    // annotations: [{t, text, side: 'above'}]
+    for (const a of opts.annotations || []) {
+      const ax = x(a.t) + (a.dx || 0);
+      s += `<text x="${ax}" y="${a.y}" text-anchor="${a.anchor || 'middle'}" font-size="12" fill="var(--muted)">${a.text}</text>`;
+    }
+
+    const label = opts.label ? `<div class="lane-label">${opts.label}</div>` : '';
+    return `<div class="lane">${label}
+      <svg viewBox="0 0 ${W} ${LANE_H + (opts.extraTop || 0)}" role="img">
+        <g transform="translate(0 ${opts.extraTop || 0})">${s}</g>
+        ${opts.topContent || ''}
+      </svg></div>`;
+  }
+
+  function opBox(code) {
+    return `<div class="opbox"><div class="stem"></div>
+      <div class="box"><code>${code}</code></div>
+      <div class="stem"></div><div class="head"></div></div>`;
+  }
+
+  function card(spec) {
+    let html = `<div class="card"><h3><code>${spec.sig}</code></h3><p class="desc">${spec.desc}</p>`;
+    for (const inp of spec.inputs) html += lane(inp.segs, spec.domain, inp.opts || {});
+    html += opBox(spec.op);
+    if (spec.marble) {
+      html += `<div class="marble-out">
+        <div class="m" style="background:${COLORS[spec.marble.c]}">${spec.marble.label}</div>
+        <div class="cap">${spec.marble.cap}</div></div>`;
+    } else {
+      html += lane(spec.output.segs, spec.domain, spec.output.opts || {});
+    }
+    if (spec.note) html += `<p class="note">${spec.note}</p>`;
+    html += `</div>`;
+    return html;
+  }
+
+  const D = [9, 15];  // shared 09:00–15:00 domain
+
+  // ── hero ──────────────────────────────────────────────────────────────
+  document.getElementById('hero').innerHTML = lane(
+    [[9, 10.5, "'A'", 0], [10.5, 12, "'B'", 1], [12, 13, "'A'", 0], [13, 15, "'C'", 2]],
+    D,
+    {
+      extraTop: 22,
+      topContent: `
+        <text x="14" y="14" font-size="12" fill="var(--muted)">● start — inclusive</text>
+        <text x="986" y="14" text-anchor="end" font-size="12" fill="var(--muted)">end — exclusive ○</text>`
+    }
+  );
+
+  // ── operations ────────────────────────────────────────────────────────
+  const sections = {
+    'ops-query': [{
+      sig: 'at(timestamp)',
+      desc: 'The value active at one instant, found by O(log n) binary search. At an exact boundary the segment <em>starting</em> there wins (start is inclusive). Outside the duration: <code>ValueError</code>.',
+      domain: D,
+      inputs: [{ segs: [[9, 11, "'low'", 0], [11, 13, "'high'", 1], [13, 15, "'low'", 0]], opts: { marker: 12 } }],
+      op: 'tl.at(dt("12:00"))',
+      marble: { label: "'high'", c: 1, cap: 'a plain value of type <code>T</code> — not a Timeline' },
+    }],
+
+    'ops-transform': [{
+      sig: 'map(func) → Timeline[U]',
+      desc: 'Apply a function to every segment’s value. Boundaries are untouched — only the values change, possibly to a different type <code>U</code>.',
+      domain: D,
+      inputs: [{ segs: [[9, 11, '10', 0], [11, 13, '25', 1], [13, 15, '10', 0]] }],
+      op: 'tl.map(lambda price: price * 2)',
+      output: { segs: [[9, 11, '20', 0], [11, 13, '50', 1], [13, 15, '20', 0]] },
+    }, {
+      sig: 'filter(predicate, gap_value=pd.NA)',
+      desc: 'Segments whose value fails the predicate are not dropped — that would tear holes in the duration. Their value is replaced with <code>gap_value</code>, keeping the timeline total.',
+      domain: D,
+      inputs: [{ segs: [[9, 11, '10', 0], [11, 13, '25', 1], [13, 15, '10', 0]] }],
+      op: 'tl.filter(lambda price: price < 20)',
+      output: { segs: [[9, 11, '10', 0], [11, 13, 'NA', 'na'], [13, 15, '10', 0]] },
+    }],
+
+    'ops-reshape': [{
+      sig: 'slice(start, end)',
+      desc: 'Extract the sub-period <code>[start, end)</code>. Segments partially overlapping the window are truncated to fit.',
+      domain: D,
+      inputs: [{ segs: [[9, 10.5, "'A'", 0], [10.5, 12, "'B'", 1], [12, 13.5, "'C'", 2], [13.5, 15, "'D'", 3]], opts: { window: [10, 13], dots: false } }],
+      op: 'tl.slice(dt("10:00"), dt("13:00"))',
+      output: { segs: [[10, 10.5, "'A'", 0], [10.5, 12, "'B'", 1], [12, 13, "'C'", 2]] },
+      note: '<code>\'A\'</code> and <code>\'C\'</code> were cut down to the window; <code>\'D\'</code> fell outside entirely.',
+    }, {
+      sig: 'merge_adjacent()',
+      desc: 'Consolidate consecutive segments carrying the same value into one. The step function is unchanged — only its representation gets smaller.',
+      domain: D,
+      inputs: [{ segs: [[9, 10, "'A'", 0], [10, 11.5, "'A'", 0], [11.5, 13, "'B'", 1], [13, 15, "'A'", 0]] }],
+      op: 'tl.merge_adjacent()',
+      output: { segs: [[9, 11.5, "'A'", 0], [11.5, 13, "'B'", 1], [13, 15, "'A'", 0]] },
+      note: '4 segments in, 3 out — the trailing <code>\'A\'</code> is not merged across <code>\'B\'</code>.',
+    }],
+
+    'ops-combine': [{
+      sig: 'Timeline.cross_product((tl1, tl2, …)) → Timeline[tuple]',
+      desc: 'Combine timelines covering the same total duration into one whose value is the tuple of all inputs’ values. A new boundary appears wherever <em>any</em> input changes — the segment pointers sweep all inputs’ boundaries in one pass.',
+      domain: D,
+      inputs: [
+        { segs: [[9, 12, "'cold'", 4], [12, 15, "'warm'", 1]], opts: { label: 'temperature' } },
+        { segs: [[9, 10.5, "'free'", 2], [10.5, 14, "'busy'", 5], [14, 15, "'free'", 2]], opts: { label: 'occupancy' } },
+      ],
+      op: 'Timeline.cross_product((temperature, occupancy))',
+      output: {
+        segs: [
+          [9, 10.5, "('cold','free')", 0], [10.5, 12, "('cold','busy')", 3],
+          [12, 14, "('warm','busy')", 1], [14, 15, "('warm','free')", 2],
+        ],
+        opts: { smallText: true },
+      },
+      note: 'Boundaries at 10:30 (occupancy changed), 12:00 (temperature changed) and 14:00 (occupancy changed) — the union of both inputs’ boundaries.',
+    }],
+
+    'ops-gaps': [{
+      sig: 'Timeline.from_segments_with_gaps(segments, gap_value=pd.NA)',
+      desc: 'Constructor for non-contiguous input: gaps between the given segments are filled with <code>gap_value</code> so the result satisfies the contiguity invariant.',
+      domain: D,
+      inputs: [{ segs: [[9, 10.5, "'A'", 0], [12, 15, "'B'", 1]], opts: { label: 'input segments (gap 10:30–12:00)' } }],
+      op: 'Timeline.from_segments_with_gaps(segments)',
+      output: { segs: [[9, 10.5, "'A'", 0], [10.5, 12, 'NA', 'na'], [12, 15, "'B'", 1]] },
+      note: '<code>pd.NA</code> is pandas’ universal missing-value marker; pass any <code>gap_value</code> to fill with something else.',
+    }],
+  };
+
+  for (const [id, specs] of Object.entries(sections))
+    document.getElementById(id).innerHTML = specs.map(card).join('');
+})();
+</script>
+</body>
+</html>
