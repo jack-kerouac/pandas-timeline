@@ -1,0 +1,17 @@
+/task-shelf:shelf-pop
+
+---
+
+Explain to mw the vectorized version. What does vectorized even mean?
+
+---
+
+And this of course also works for three or more consecutive intervals, though we only use shift() once, since that's for detecting *changes* in values.
+
+---
+
+One more question about vectorization: This just results in a more optimized C coded loop. It does not shift the operation to a GPU, or so?
+
+---
+
+Ok, implement this change.
