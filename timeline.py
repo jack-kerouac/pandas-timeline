@@ -171,16 +171,22 @@ class Timeline[T]:
         Returns:
             A new Timeline with adjacent segments containing the same value merged together.
             This operation reduces the number of segments by combining consecutive
-            segments that have identical values.
+            segments that have identical values. Adjacent missing-value segments
+            (e.g. gaps produced by filter()) are considered equal and merged.
         """
-        # Merge adjacent segments with same value
-        merged = []
-        for _, row in self._df.iterrows():
-            if merged and merged[-1][2] == row['value']:
-                merged[-1] = (merged[-1][0], row['end'], row['value'])
-            else:
-                merged.append((row['start'], row['end'], row['value']))
-        return Timeline.from_segments(merged)
+        values = self._df['value']
+        prev = values.shift()
+        # A run boundary is where the value differs from the previous row.
+        # pd.NA comparisons return NA: treat NA-vs-NA as equal (merge gaps),
+        # NA-vs-value as a change (fillna(True)).
+        changed = ((values != prev) & ~(values.isna() & prev.isna())).fillna(True)
+        changed = changed.astype(bool)
+        changed.iloc[0] = True
+        group_id = changed.cumsum()
+        merged = self._df.groupby(group_id).agg(start=('start', 'first'), end=('end', 'last'))
+        # Take each run's value by position: groupby 'first' would skip NA.
+        merged['value'] = values[changed.values].values
+        return Timeline.from_dataframe(merged.reset_index(drop=True))
 
     @staticmethod
     def cross_product(timelines: tuple['Timeline', ...], /) -> 'Timeline[tuple]':

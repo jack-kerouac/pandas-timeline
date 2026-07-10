@@ -209,6 +209,53 @@ def test_merge_adjacent_segments():
     assert merged.df.iloc[2]['end'] == dt('05:00')
     assert merged.df.iloc[2]['value'] == 3
 
+def test_merge_adjacent_merges_na_segments():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', 'a'),
+        ts('01:00', '02:00', pd.NA),
+        ts('02:00', '03:00', pd.NA),
+        ts('03:00', '04:00', 'b'),
+    ])
+    merged = timeline.merge_adjacent()
+    assert len(merged.df) == 3
+    assert merged.df.iloc[1]['start'] == dt('01:00')
+    assert merged.df.iloc[1]['end'] == dt('03:00')
+    assert merged.df.iloc[1]['value'] is pd.NA
+
+def test_merge_adjacent_starting_with_na():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', pd.NA),
+        ts('01:00', '02:00', pd.NA),
+        ts('02:00', '03:00', 1),
+    ])
+    merged = timeline.merge_adjacent()
+    assert len(merged.df) == 2
+    assert merged.df.iloc[0]['start'] == dt('00:00')
+    assert merged.df.iloc[0]['end'] == dt('02:00')
+    assert merged.df.iloc[0]['value'] is pd.NA
+    assert merged.df.iloc[1]['value'] == 1
+
+def test_merge_adjacent_does_not_merge_na_with_value():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', pd.NA),
+        ts('01:00', '02:00', 1),
+        ts('02:00', '03:00', pd.NA),
+    ])
+    merged = timeline.merge_adjacent()
+    assert len(merged.df) == 3
+
+def test_merge_adjacent_with_tuple_values():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', (1, 'x')),
+        ts('01:00', '02:00', (1, 'x')),
+        ts('02:00', '03:00', (2, 'y')),
+    ])
+    merged = timeline.merge_adjacent()
+    assert len(merged.df) == 2
+    assert merged.df.iloc[0]['end'] == dt('02:00')
+    assert merged.df.iloc[0]['value'] == (1, 'x')
+    assert merged.df.iloc[1]['value'] == (2, 'y')
+
 def test_map_applies_function_to_all_segments():
     timeline = Timeline.from_segments([
         ts('00:00', '01:00', 1),
