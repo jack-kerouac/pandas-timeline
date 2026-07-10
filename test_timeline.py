@@ -436,6 +436,20 @@ def test_filter_with_custom_gap_value():
     assert df.iloc[2]['value'] == 'a'
 
 
+def test_filter_preserves_int_values_exactly():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', 3),
+        ts('01:00', '02:00', 4),
+    ])
+    result = timeline.filter(lambda v: v == 3)
+    df = result.df
+    surviving = df.iloc[0]['value']
+    assert surviving == 3
+    assert type(surviving) is int
+    assert str(surviving) == '3'
+    assert df.iloc[1]['value'] is pd.NA
+
+
 def test_filter_preserves_time_structure():
     timeline = Timeline.from_segments([
         ts('09:00', '10:00', 5),

@@ -124,7 +124,11 @@ class Timeline[T]:
     def filter(self, predicate: Callable[[T], bool], /, *, gap_value=pd.NA) -> Self:
         new_df = self._df.copy()
         mask = new_df['value'].apply(predicate)
-        new_df.loc[~mask, 'value'] = gap_value
+        if not mask.all():
+            # Cast to object first: assigning e.g. pd.NA into an int64 column
+            # would upcast surviving values to float64.
+            new_df['value'] = new_df['value'].astype(object)
+            new_df.loc[~mask, 'value'] = gap_value
         return Timeline.from_dataframe(new_df)
 
     def slice(self, start: pd.Timestamp, end: pd.Timestamp) -> Self:
