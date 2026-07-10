@@ -1,0 +1,5 @@
+/task-shelf:shelf-pop
+
+---
+
+If we add this note to map, we should also add it to other methods, esp. cross_product, or? Let's maybe keep this doc change lean...
