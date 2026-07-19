@@ -285,3 +285,120 @@ class Timeline[T]:
 
     def __repr__(self) -> str:
         return f"Timeline({self._df})"
+
+
+class GridTimeline[T]:
+    """
+    GridTimeline<T> wraps a Timeline<T> whose segment boundaries all lie on a
+    fixed time grid (e.g. quarter hours). Alignment is validated once at
+    construction; every operation preserves it and returns a GridTimeline,
+    so the guarantee holds through transformation chains.
+
+    Use the 'timeline' property to unwrap the underlying Timeline.
+    """
+    def __init__(self, timeline: Timeline[T], freq: str | pd.Timedelta, /):
+        """
+        timeline: The Timeline to wrap.
+        freq: Grid spacing, e.g. '15min'. Grid points are multiples of freq
+            anchored at midnight.
+
+        Raises:
+            ValueError: If freq is not positive or any segment boundary does
+                not lie on the grid.
+        """
+        freq = pd.Timedelta(freq)
+        if freq <= pd.Timedelta(0):
+            raise ValueError(f"freq must be positive, got {freq}")
+        # Contiguity means checking every start plus the final end covers all boundaries.
+        boundaries = pd.concat([timeline._df['start'], timeline._df['end'].iloc[-1:]])
+        misaligned = boundaries[boundaries.dt.floor(freq) != boundaries]
+        if not misaligned.empty:
+            raise ValueError(f"Boundary {misaligned.iloc[0]} does not lie on the {freq} grid")
+        self._timeline = timeline
+        self._freq = freq
+
+    @staticmethod
+    def from_segments(segments: Sequence[tuple[pd.Timestamp, pd.Timestamp, T]], /, *, freq: str | pd.Timedelta) -> 'GridTimeline[T]':
+        """
+        segments: List of (start, end, value) tuples.
+        freq: Grid spacing, e.g. '15min'.
+        """
+        return GridTimeline(Timeline.from_segments(segments), freq)
+
+    @classmethod
+    def _from_trusted(cls, timeline: Timeline, freq: pd.Timedelta, /) -> Self:
+        """
+        Internal constructor for a Timeline produced by an operation that
+        cannot break grid alignment. Skips validation.
+        """
+        grid_timeline = cls.__new__(cls)
+        grid_timeline._timeline = timeline
+        grid_timeline._freq = freq
+        return grid_timeline
+
+    @property
+    def timeline(self) -> Timeline[T]:
+        """The wrapped Timeline."""
+        return self._timeline
+
+    @property
+    def freq(self) -> pd.Timedelta:
+        return self._freq
+
+    @property
+    def df(self) -> pd.DataFrame:
+        return self._timeline.df
+
+    @property
+    def start(self) -> pd.Timestamp:
+        return self._timeline.start
+
+    @property
+    def end(self) -> pd.Timestamp:
+        return self._timeline.end
+
+    def at(self, timestamp: pd.Timestamp, /) -> T:
+        return self._timeline.at(timestamp)
+
+    def map[U](self, func: Callable[[T], U], /) -> 'GridTimeline[U]':
+        return GridTimeline._from_trusted(self._timeline.map(func), self._freq)
+
+    def filter(self, predicate: Callable[[T], bool], /, *, gap_value=pd.NA) -> Self:
+        return GridTimeline._from_trusted(self._timeline.filter(predicate, gap_value=gap_value), self._freq)
+
+    def merge_adjacent(self) -> Self:
+        return GridTimeline._from_trusted(self._timeline.merge_adjacent(), self._freq)
+
+    def slice(self, start: pd.Timestamp, end: pd.Timestamp) -> Self:
+        """Extract a sub-period as a new GridTimeline.
+
+        In addition to Timeline.slice() semantics, both bounds must lie on
+        the grid; off-grid bounds raise ValueError.
+        """
+        for bound in (start, end):
+            if bound.floor(self._freq) != bound:
+                raise ValueError(f"Slice bound {bound} does not lie on the {self._freq} grid")
+        return GridTimeline._from_trusted(self._timeline.slice(start, end), self._freq)
+
+    @staticmethod
+    def cross_product(grid_timelines: tuple['GridTimeline', ...], /) -> 'GridTimeline[tuple]':
+        """Combine multiple GridTimelines sharing the same grid into one with composite values."""
+        freqs = {gt._freq for gt in grid_timelines}
+        if len(freqs) != 1:
+            raise ValueError(f"All timelines must share the same grid freq, got {sorted(freqs)}")
+        combined = Timeline.cross_product(tuple(gt._timeline for gt in grid_timelines))
+        return GridTimeline._from_trusted(combined, freqs.pop())
+
+    def __len__(self) -> int:
+        return len(self._timeline)
+
+    def __iter__(self):
+        return iter(self._timeline)
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, GridTimeline):
+            return NotImplemented
+        return self._freq == other._freq and self._timeline == other._timeline
+
+    def __repr__(self) -> str:
+        return f"GridTimeline(freq='{self._freq}', {self._timeline._df})"

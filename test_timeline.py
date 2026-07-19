@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from timeline import Timeline
+from timeline import GridTimeline, Timeline
 
 # Helper to create pd.Timestamp datetime from HH:MM
 dt = lambda t: pd.Timestamp(f"2023-01-01 {t}")
@@ -526,3 +526,108 @@ def test_filter_preserves_time_structure():
     assert df.iloc[0]['end'] == dt('10:00')
     assert df.iloc[1]['start'] == dt('10:00')
     assert df.iloc[1]['end'] == dt('11:00')
+
+# --- GridTimeline ---
+
+def grid_timeline():
+    return GridTimeline.from_segments([
+        ts('00:00', '00:15', 1),
+        ts('00:15', '01:00', 2),
+        ts('01:00', '02:30', 3),
+    ], freq='15min')
+
+def test_grid_timeline_wraps_aligned_timeline():
+    timeline = Timeline.from_segments([
+        ts('00:00', '00:15', 1),
+        ts('00:15', '01:00', 2),
+    ])
+    grid = GridTimeline(timeline, '15min')
+    assert grid.freq == pd.Timedelta('15min')
+    assert grid.timeline == timeline
+    assert grid.start == dt('00:00')
+    assert grid.end == dt('01:00')
+    assert len(grid) == 2
+    assert grid.at(dt('00:20')) == 2
+    assert list(grid) == [ts('00:00', '00:15', 1), ts('00:15', '01:00', 2)]
+
+def test_grid_timeline_from_segments():
+    grid = grid_timeline()
+    assert isinstance(grid, GridTimeline)
+    assert len(grid) == 3
+
+def test_grid_timeline_rejects_misaligned_segment_boundary():
+    timeline = Timeline.from_segments([
+        ts('00:00', '00:03', 1),
+        ts('00:03', '00:15', 2),
+    ])
+    with pytest.raises(ValueError, match=r".*00:03.*does not lie on the.*grid"):
+        GridTimeline(timeline, '15min')
+
+def test_grid_timeline_rejects_misaligned_final_end():
+    timeline = Timeline.from_segments([
+        ts('00:00', '00:20', 1),
+    ])
+    with pytest.raises(ValueError, match=r".*00:20.*does not lie on the.*grid"):
+        GridTimeline(timeline, '15min')
+
+def test_grid_timeline_rejects_non_positive_freq():
+    timeline = Timeline.from_segments([ts('00:00', '00:15', 1)])
+    with pytest.raises(ValueError, match=r".*positive.*"):
+        GridTimeline(timeline, '0min')
+
+def test_grid_timeline_map_returns_grid_timeline():
+    mapped = grid_timeline().map(lambda v: v * 10)
+    assert isinstance(mapped, GridTimeline)
+    assert mapped.freq == pd.Timedelta('15min')
+    assert mapped.at(dt('00:00')) == 10
+
+def test_grid_timeline_filter_returns_grid_timeline():
+    filtered = grid_timeline().filter(lambda v: v == 2)
+    assert isinstance(filtered, GridTimeline)
+    assert filtered.at(dt('00:00')) is pd.NA
+    assert filtered.at(dt('00:15')) == 2
+
+def test_grid_timeline_merge_adjacent_returns_grid_timeline():
+    merged = grid_timeline().map(lambda v: 'x').merge_adjacent()
+    assert isinstance(merged, GridTimeline)
+    assert len(merged) == 1
+
+def test_grid_timeline_slice_with_aligned_bounds():
+    sliced = grid_timeline().slice(dt('00:15'), dt('01:30'))
+    assert isinstance(sliced, GridTimeline)
+    assert sliced.freq == pd.Timedelta('15min')
+    assert sliced.start == dt('00:15')
+    assert sliced.end == dt('01:30')
+
+def test_grid_timeline_slice_rejects_off_grid_bounds():
+    with pytest.raises(ValueError, match=r".*00:03.*does not lie on the.*grid"):
+        grid_timeline().slice(dt('00:03'), dt('01:00'))
+    with pytest.raises(ValueError, match=r".*01:20.*does not lie on the.*grid"):
+        grid_timeline().slice(dt('00:15'), dt('01:20'))
+
+def test_grid_timeline_cross_product():
+    a = GridTimeline.from_segments([
+        ts('00:00', '01:00', 1),
+        ts('01:00', '02:00', 2),
+    ], freq='15min')
+    b = GridTimeline.from_segments([
+        ts('00:00', '00:30', 'x'),
+        ts('00:30', '02:00', 'y'),
+    ], freq='15min')
+    combined = GridTimeline.cross_product((a, b))
+    assert isinstance(combined, GridTimeline)
+    assert combined.freq == pd.Timedelta('15min')
+    assert combined.at(dt('00:45')) == (1, 'y')
+    assert len(combined) == 3
+
+def test_grid_timeline_cross_product_rejects_mixed_freqs():
+    a = GridTimeline.from_segments([ts('00:00', '01:00', 1)], freq='15min')
+    b = GridTimeline.from_segments([ts('00:00', '01:00', 2)], freq='30min')
+    with pytest.raises(ValueError, match=r".*same grid.*"):
+        GridTimeline.cross_product((a, b))
+
+def test_grid_timeline_equality():
+    assert grid_timeline() == grid_timeline()
+    other_freq = GridTimeline(grid_timeline().timeline, '5min')
+    assert grid_timeline() != other_freq
+    assert grid_timeline() != grid_timeline().timeline
