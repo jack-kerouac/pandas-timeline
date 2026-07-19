@@ -631,3 +631,26 @@ def test_grid_timeline_equality():
     other_freq = GridTimeline(grid_timeline().timeline, '5min')
     assert grid_timeline() != other_freq
     assert grid_timeline() != grid_timeline().timeline
+
+def test_grid_timeline_cross_product_matches_timeline_cross_product():
+    a = GridTimeline.from_segments([
+        ts('00:00', '00:15', 1),
+        ts('00:15', '01:30', 2),
+        ts('01:30', '02:00', 3),
+    ], freq='15min')
+    b = GridTimeline.from_segments([
+        ts('00:00', '00:45', 'x'),
+        ts('00:45', '02:00', 'y'),
+    ], freq='15min')
+    c = GridTimeline.from_segments([
+        ts('00:00', '02:00', True),
+    ], freq='15min').filter(lambda v: False)  # all-NA values
+    combined = GridTimeline.cross_product((a, b, c))
+    expected = Timeline.cross_product((a.timeline, b.timeline, c.timeline))
+    assert combined.timeline == expected
+
+def test_grid_timeline_cross_product_rejects_mismatched_durations():
+    a = GridTimeline.from_segments([ts('00:00', '01:00', 1)], freq='15min')
+    b = GridTimeline.from_segments([ts('00:00', '02:00', 2)], freq='15min')
+    with pytest.raises(ValueError, match=r".*same duration.*"):
+        GridTimeline.cross_product((a, b))
