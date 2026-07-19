@@ -153,9 +153,14 @@ class Timeline[T]:
         Returns:
             A new Timeline containing only segments overlapping with [start, end).
 
+        Raises:
+            ValueError: If start is not before end, or if [start, end) does not
+                overlap the timeline's duration.
+
         Note:
             Segments that partially overlap with the slice period will be
-            truncated to fit within the specified bounds.
+            truncated to fit within the specified bounds. Bounds extending
+            beyond the timeline's duration are clamped to it.
 
         Performance:
             Slice as early as possible in a transformation chain. Per-segment
@@ -165,17 +170,22 @@ class Timeline[T]:
             timeline, slicing 1% before three map() calls ran ~30x faster
             (~1.6 ms vs ~50 ms) than slicing after them.
         """
-        # Extract segments overlapping with [start, end)
+        if start >= end:
+            raise ValueError(f"Slice start must be before end, got [{start}, {end})")
+        if end <= self.start or start >= self.end:
+            raise ValueError(
+                f"Slice [{start}, {end}) does not overlap timeline duration [{self.start}, {self.end})"
+            )
+        # Extract segments overlapping with [start, end); at least one matches
         mask = (self._df['end'] > start) & (self._df['start'] < end)
         sliced = self._df[mask].copy()
-        if not sliced.empty:
-            # Adjust the first segment's start if needed
-            if sliced.iloc[0]['start'] < start:
-                sliced.iat[0, sliced.columns.get_loc('start')] = start
-            # Adjust the last segment's end if needed
-            if sliced.iloc[-1]['end'] > end:
-                sliced.iat[-1, sliced.columns.get_loc('end')] = end
-        return Timeline(sliced)
+        # Adjust the first segment's start if needed
+        if sliced.iloc[0]['start'] < start:
+            sliced.iat[0, sliced.columns.get_loc('start')] = start
+        # Adjust the last segment's end if needed
+        if sliced.iloc[-1]['end'] > end:
+            sliced.iat[-1, sliced.columns.get_loc('end')] = end
+        return Timeline._from_trusted(sliced)
 
     def merge_adjacent(self) -> Self:
         """Merge adjacent segments with identical values.

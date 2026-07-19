@@ -189,6 +189,24 @@ def test_slice_aligned_with_segment_starts_and_ends():
     assert sliced.start == dt('01:00')
     assert sliced.end == dt('03:00')
 
+def test_slice_with_start_not_before_end_raises():
+    timeline = Timeline.from_segments([
+        ts('00:00', '01:00', 1)
+    ])
+    with pytest.raises(ValueError, match=r".*start must be before end.*"):
+        timeline.slice(dt('00:45'), dt('00:30'))
+    with pytest.raises(ValueError, match=r".*start must be before end.*"):
+        timeline.slice(dt('00:30'), dt('00:30'))
+
+def test_slice_outside_timeline_duration_raises():
+    timeline = Timeline.from_segments([
+        ts('01:00', '02:00', 1)
+    ])
+    with pytest.raises(ValueError, match=r".*does not overlap timeline duration.*"):
+        timeline.slice(dt('00:00'), dt('01:00'))
+    with pytest.raises(ValueError, match=r".*does not overlap timeline duration.*"):
+        timeline.slice(dt('02:00'), dt('03:00'))
+
 def test_merge_adjacent_segments():
     timeline = Timeline.from_segments([
         ts('00:00', '01:00', 1),
